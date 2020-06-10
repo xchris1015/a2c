@@ -16,10 +16,8 @@ class World(gym.Env):
         self.agents = [Agent() for i in range(num_agents)]
         ## init agent state with encoder function, state = np.array([0,1]) or np.array([1,0])
         for i, agent in enumerate(self.agents):
-            agent.state = self.encoder(np.random.choice(2), 2)
+            agent.state = np.random.choice(2)
         ## required variables for gym inheritance
-        self.action_space = spaces.Discrete(2)
-        self.observation_space = spaces.Box(-np.inf, np.inf, dtype=np.float32)
 
         ## current state set to None, state == action == observation in this case, also use encoder function,
         # example np.array([0,1]), means there are two agents and the second agent been selected
@@ -36,9 +34,14 @@ class World(gym.Env):
     reset function to reset all of the agent state
     """
     def reset(self):
-        for agent in enumerate(self.agents):
-            agent.state = self.encoder(np.random.choice(2), 2)
+        current_state = []
+        for agent in self.agents:
+            agent.state = np.random.choice(2)
+            current_state.append(agent.state)
 
+        self.state = current_state
+
+        return np.array(current_state)
     """
     use state transaction function to get new state for each agent, then test if it is done, get the reward for each step
     """
@@ -49,9 +52,10 @@ class World(gym.Env):
         done = bool(self.time >= 1000)
 
         if not done:
-            reward = self.get_reward(action)
+            reward = np.zeros(self.num_agents)
+            reward[action] = self.get_reward(action)
         else:
-            reward = 0
+            reward = np.zeros(self.num_agents)
 
         return np.array(self.state), reward, done, {}
 
@@ -79,7 +83,7 @@ class World(gym.Env):
     def get_reward(self, action):
         reward = 0
         for i, agent in enumerate(self.agents):
-            if action[i] == 1.0:
+            if action == i:
                 reward = self.reward_map[action][agent.state]
 
         return reward
@@ -87,13 +91,6 @@ class World(gym.Env):
     """
     encoder for state and action
     """
-
-    def encoder(self, position, size):
-        result = np.zeros(size)
-        result[position] = 1
-
-        return result
-
 
 class Agent(object):
     def __init__(self):
