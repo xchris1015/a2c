@@ -17,6 +17,7 @@ class World(gym.Env):
         ## init agent state with encoder function, state = np.array([0,1]) or np.array([1,0])
         for i, agent in enumerate(self.agents):
             agent.state = np.random.choice(2)
+            agent.step_reward = 0
         ## required variables for gym inheritance
 
         ## current state set to None, state == action == observation in this case, also use encoder function,
@@ -37,6 +38,7 @@ class World(gym.Env):
         current_state = []
         for agent in self.agents:
             agent.state = np.random.choice(2)
+            agent.step_reward = 0
             current_state.append(agent.state)
 
         self.state = current_state
@@ -46,15 +48,17 @@ class World(gym.Env):
     use state transaction function to get new state for each agent, then test if it is done, get the reward for each step
     """
     def step(self, action):
-        for i, agent in enumerate(self.agents):
-            agent.state = self.get_new_state(agent)
-
         done = bool(self.time >= 300)
 
         if not done:
             reward = self.get_reward(action)
         else:
             reward = 0
+
+        for i, agent in enumerate(self.agents):
+            agent.state = self.get_new_state(agent)
+            if action == i:
+                agent.step_reward += reward
 
         return np.array(self.state), reward, done, {}
 
@@ -94,3 +98,4 @@ class World(gym.Env):
 class Agent(object):
     def __init__(self):
         self.state = None
+        self.step_reward = 0
