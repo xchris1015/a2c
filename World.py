@@ -49,13 +49,12 @@ class World(gym.Env):
         for i, agent in enumerate(self.agents):
             agent.state = self.get_new_state(agent)
 
-        done = bool(self.time >= 1000)
+        done = bool(self.time >= 300)
 
         if not done:
-            reward = np.zeros(self.num_agents)
-            reward[action] = self.get_reward(action)
+            reward = self.get_reward(action)
         else:
-            reward = np.zeros(self.num_agents)
+            reward = 0
 
         return np.array(self.state), reward, done, {}
 
