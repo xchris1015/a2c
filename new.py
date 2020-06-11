@@ -99,7 +99,7 @@ def a2c(env):
 
     ## placeholder
 
-    all_reward = []
+    all_rewards = []
     entropy_term = 0
 
     for episode in range(max_episodes):
@@ -167,6 +167,7 @@ def a2c(env):
         for agent in env.agents:
             final_reward += np.log(agent.step_reward / num_steps)
 
+        all_rewards.append(final_reward)
         sys.stdout.write("episode: {}, reward: {},  \n".format(episode, final_reward))
 
 
@@ -185,17 +186,13 @@ def a2c(env):
         ac_optimizer.step()
 
     # Plot results
-  #  smoothed_rewards = pd.Series.rolling(pd.Series(all_rewards), 10).mean()
-  #  smoothed_rewards = [elem for elem in smoothed_rewards]
- #   plt.plot(all_rewards)
- #   plt.plot(smoothed_rewards)
- #   plt.plot()
+    smoothed_rewards = pd.Series.rolling(pd.Series(all_rewards), 10).mean()
+    smoothed_rewards = [elem for elem in smoothed_rewards]
+    plt.plot(all_rewards)
+    plt.plot(smoothed_rewards)
+    plt.plot()
     plt.xlabel('Episode')
     plt.ylabel('Reward')
-    plt.show()
-
-    plt.xlabel('Episode')
-    plt.ylabel('Episode length')
     plt.show()
 
 if __name__ == "__main__":
