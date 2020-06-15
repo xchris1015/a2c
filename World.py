@@ -44,6 +44,15 @@ class World(gym.Env):
         self.state = current_state
 
         return np.array(current_state)
+
+    def discount_with_dones(rewards, dones, gamma):
+        discounted = []
+        r = 0
+        for reward, done in zip(rewards[::-1], dones[::-1]):
+            r = reward + gamma * r * (1. - done)  # fixed off by one bug
+            discounted.append(r)
+        return discounted[::-1]
+
     """
     use state transaction function to get new state for each agent, then test if it is done, get the reward for each step
     """
@@ -55,12 +64,17 @@ class World(gym.Env):
         else:
             reward = 0
 
+        best_selection = True
         for i, agent in enumerate(self.agents):
             agent.state = self.get_new_state(agent)
+            if reward < self.get_reward(i):
+                best_selection = False
             if action == i:
                 agent.step_reward += reward
+            #print("Agent_",i,"    State: ","Good" if agent.state == 0 else "Bad", "   Agent_Reward:", self.get_reward(i))
+        #print("Current Selection:", action)
 
-        return np.array(self.state), reward, done, {}
+        return np.array(self.state), reward, done, best_selection
 
     """
     get the new state for input agent
