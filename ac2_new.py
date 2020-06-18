@@ -8,7 +8,8 @@ View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 Using:
 tensorflow 1.0
 gym 0.8.0
-Mofan, pl for actor, td for critic
+Mofan, pl for actor, n_step_return_error for critic
+use one Q net and one Actor net;
 """
 
 import numpy as np
@@ -91,7 +92,7 @@ class Actor(object):
     def choose_action(self, s):
         s = s[np.newaxis, :]
         probs = self.sess.run(self.acts_prob, {self.s: s})  # get probabilities for all actions
-        #print(probs)
+#        print(probs)
         return np.random.choice(np.arange(probs.shape[1]), p=probs.ravel())  # return a int
 
 
