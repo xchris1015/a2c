@@ -62,19 +62,20 @@ class World(gym.Env):
         if not done:
             reward = self.get_reward(action)
         else:
-            reward = 0
+            reward = np.zeros(len(self.num_agents))
 
         best_selection = True
         for i, agent in enumerate(self.agents):
             agent.state = self.get_new_state(agent)
-            if reward < self.get_reward(i):
+            if reward[action] < self.reward_map.get(i)[agent.state]:
                 best_selection = False
             if action == i:
-                agent.step_reward += reward
+                agent.step_reward += reward[action]
+            agent.reward_record.append(reward[i])
             #print("Agent_",i,"    State: ","Good" if agent.state == 0 else "Bad", "   Agent_Reward:", self.get_reward(i))
         #print("Current Selection:", action)
 
-        return np.array(self.state), reward, done, best_selection
+        return np.array(self.state), np.array(reward), done, best_selection
 
     """
     get the new state for input agent
@@ -98,10 +99,10 @@ class World(gym.Env):
     """
 
     def get_reward(self, action):
-        reward = 0
+        reward = np.zeros(len(self.agents))
         for i, agent in enumerate(self.agents):
             if action == i:
-                reward = self.reward_map[action][agent.state]
+                reward[action] = self.reward_map[action][agent.state]
 
         return reward
 
@@ -113,3 +114,4 @@ class Agent(object):
     def __init__(self):
         self.state = None
         self.step_reward = 0
+        self.reward_record = []
