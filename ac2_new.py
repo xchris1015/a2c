@@ -235,10 +235,8 @@ for i_episode in range(MAX_EPISODE):
             errors[i] = critics[i].learn(s, r[i], s_) # gradient = grad[r + gamma * V(s_) - V(s)]
             R_1 = agent.step_reward / t
             if R_1 == 0:
-                jump += 1
-                continue
-            else:
-                error += errors[i] / R_1
+                R_1 = 0.01
+            error += errors[i] / R_1
 
         actor.learn(s, a, error)  # true_gradient = grad[logPi(s,a) * td_error]
 
