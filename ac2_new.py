@@ -96,14 +96,14 @@ class Actor(object):
 
 
 class Critic(object):
-    def __init__(self, sess, n_features, lr=0.01):
+    def __init__(self, env, sess, n_features, lr=0.01):
         self.sess = sess
 
         self.s = tf.placeholder(tf.float32, [1, n_features], "state")
         self.v_ = tf.placeholder(tf.float32, [1, 1], "v_next")
         self.td_r = tf.placeholder(tf.float32, None, 'td_r')
 
-        with tf.variable_scope('Critic_1'):
+        with tf.variable_scope('Critic'):
             l1 = tf.layers.dense(
                 inputs=self.s,
                 units=250,  # number of hidden units
@@ -121,56 +121,16 @@ class Critic(object):
                 activation=None,
                 kernel_initializer=tf.random_normal_initializer(0., .1),  # weights
                 bias_initializer=tf.constant_initializer(0.1),  # biases
-                name='V1'
+                name='V'
             )
 
-        with tf.variable_scope('squared_td_error_1'):
-            self.n_steo_error = self.td_r + GAMMA * self.v_ - self.v
-            self.loss = tf.square(self.n_steo_error)  # TD_error = (r+gamma*V_next) - V_eval = target - prediction
-        with tf.variable_scope('train_1'):
-            self.train_op = tf.train.AdamOptimizer(lr).minimize(self.loss)
-
-    def learn(self, s, td_r, s_):
-        s, s_ = s[np.newaxis, :], s_[np.newaxis, :]
-
-        v_ = self.sess.run(self.v, {self.s: s_})
-        td_error, _ = self.sess.run([self.td_r, self.train_op],
-                                    {self.s: s, self.v_: v_, self.td_r: td_r})
-        return td_error
-
-class Critic_1(object):
-    def __init__(self, sess, n_features, lr=0.01):
-        self.sess = sess
-
-        self.s = tf.placeholder(tf.float32, [1, n_features], "state")
-        self.v_ = tf.placeholder(tf.float32, [1, 1], "v_next")
-        self.td_r = tf.placeholder(tf.float32, None, 'td_r')
-
-        with tf.variable_scope('Critic_2'):
-            l1 = tf.layers.dense(
-                inputs=self.s,
-                units=250,  # number of hidden units
-                activation=tf.nn.relu,  # None
-                # have to be linear to make sure the convergence of actor.
-                # But linear approximator seems hardly learns the correct Q.
-                kernel_initializer=tf.random_normal_initializer(0., .1),  # weights
-                bias_initializer=tf.constant_initializer(0.1),  # biases
-                name='l2'
-            )
-
-            self.v = tf.layers.dense(
-                inputs=l1,
-                units=1,  # output units
-                activation=None,
-                kernel_initializer=tf.random_normal_initializer(0., .1),  # weights
-                bias_initializer=tf.constant_initializer(0.1),  # biases
-                name='V2'
-            )
-
-        with tf.variable_scope('squared_td_error_2'):
-            self.n_steo_error = self.td_r + GAMMA * self.v_ - self.v
-            self.loss = tf.square(self.n_steo_error)  # TD_error = (r+gamma*V_next) - V_eval = target - prediction
-        with tf.variable_scope('train_2'):
+        with tf.variable_scope('squared_td_error'):
+            combine_rewards = 0
+            for i, agent in enumerate(env.agents):
+                combine_rewards += self.td_r[i] / agent.average_step_reward
+            self.td_error = combine_rewards + GAMMA * self.v_ - self.v
+            self.loss = tf.square(self.td_error)  # TD_error = (r+gamma*V_next) - V_eval = target - prediction
+        with tf.variable_scope('train'):
             self.train_op = tf.train.AdamOptimizer(lr).minimize(self.loss)
 
     def learn(self, s, td_r, s_):
@@ -185,12 +145,11 @@ class Critic_1(object):
 sess = tf.Session()
 
 actor = Actor(sess, n_features=N_F, n_actions=N_A, lr=LR_A)
-critics = []
 
-critic_1 = Critic(sess, n_features=N_F, lr=LR_C)
-critics.append(critic_1)
-critic_2 = Critic_1(sess, n_features=N_F, lr=LR_C)
-critics.append(critic_2)
+
+critic = Critic(env, sess, n_features=N_F, lr=LR_C)
+
+
 
 # we need a good teacher, so the teacher should learn faster than the actor
 
@@ -222,23 +181,14 @@ for i_episode in range(MAX_EPISODE):
         # five_step_dones.append(done)
         # times+=1
         t += 1
-
         # five_step = discount_with_dones(five_step_rewards, five_step_dones, GAMMA)
 
         track_r.append(r[a])
         best_selections.append(best_selection)
 
-        errors = np.zeros(num_agents)
-        error = 0.0
-        for i, agent in enumerate(env.agents):
-            #    five_step = discount_with_dones(five_step_rewards[i], five_step_dones, GAMMA)
-            errors[i] = critics[i].learn(s, r[i], s_) # gradient = grad[r + gamma * V(s_) - V(s)]
-            R_1 = agent.step_reward / t
-            if R_1 == 0:
-                R_1 = 0.01
-            error += errors[i] / R_1
+        td_error = critic.learn(s, r, s_)
 
-        actor.learn(s, a, error)  # true_gradient = grad[logPi(s,a) * td_error]
+        actor.learn(s, a, td_error)  # true_gradient = grad[logPi(s,a) * td_error]
 
         s = s_
 
