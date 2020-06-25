@@ -59,7 +59,7 @@ class World(gym.Env):
     """
     def step(self, action):
         self.time += 1
-        done = bool(self.time >= 300)
+        done = False
 
         if not done:
             reward = self.get_reward(action)
@@ -75,8 +75,8 @@ class World(gym.Env):
                 agent.step_reward += reward[action]
             agent.reward_record.append(reward[i])
             agent.average_step_reward = agent.step_reward / self.time
-            print(self.time)
-            print(agent.step_reward)
+            #print(self.time)
+            #print(agent.step_reward)
             #print("Agent_",i,"    State: ","Good" if agent.state == 0 else "Bad", "   Agent_Reward:", self.get_reward(i))
         #print("Current Selection:", action)
 
@@ -90,6 +90,7 @@ class World(gym.Env):
         current_state = agent.state
         state_transition_model = np.random.choice(2, p=[0.9, 0.1])
         if state_transition_model == 1:
+            agent.turn_point.append(self.time)
             if current_state == 1:
                 new_state = 0
             else:
@@ -121,3 +122,4 @@ class Agent(object):
         self.step_reward = 0
         self.reward_record = []
         self.average_step_reward = 0
+        self.turn_point = []
