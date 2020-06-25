@@ -126,8 +126,8 @@ class Critic(object):
             )
 
         with tf.variable_scope('squared_td_error_1'):
-            self.n_steo_error = self.td_r + GAMMA * self.v_ - self.v
-            self.loss = tf.square(self.n_steo_error)  # TD_error = (r+gamma*V_next) - V_eval = target - prediction
+            self.td_error = self.td_r + GAMMA * self.v_ - self.v
+            self.loss = tf.square(self.td_error)  # TD_error = (r+gamma*V_next) - V_eval = target - prediction
         with tf.variable_scope('train_1'):
             self.train_op = tf.train.AdamOptimizer(lr).minimize(self.loss)
 
@@ -169,8 +169,8 @@ class Critic_1(object):
             )
 
         with tf.variable_scope('squared_td_error_2'):
-            self.n_steo_error = self.td_r + GAMMA * self.v_ - self.v
-            self.loss = tf.square(self.n_steo_error)  # TD_error = (r+gamma*V_next) - V_eval = target - prediction
+            self.td_error = self.td_r + GAMMA * self.v_ - self.v
+            self.loss = tf.square(self.td_error)  # TD_error = (r+gamma*V_next) - V_eval = target - prediction
         with tf.variable_scope('train_2'):
             self.train_op = tf.train.AdamOptimizer(lr).minimize(self.loss)
 
