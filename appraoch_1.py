@@ -55,7 +55,6 @@ class Actor(object):
         self.s = tf.placeholder(tf.float32, [1, n_features], "state")
         self.a = tf.placeholder(tf.int32, None, "act")
         self.td_error = tf.placeholder(tf.float32, None, "td_error")  # TD_error
-        self.n_step_error = tf.placeholder(tf.float32, None, "n_step_error")  # n_step_error
 
         with tf.variable_scope('Actor'):
             l1 = tf.layers.dense(
@@ -103,6 +102,7 @@ class Critic(object):
         self.s = tf.placeholder(tf.float32, [1, n_features], "state")
         self.v_ = tf.placeholder(tf.float32, [1, 1], "v_next")
         self.td_r = tf.placeholder(tf.float32, None, 'td_r')
+        self.R = tf.placeholder(tf.float32, None, 'R')
 
         with tf.variable_scope('Critic_1'):
             l1 = tf.layers.dense(
@@ -126,17 +126,17 @@ class Critic(object):
             )
 
         with tf.variable_scope('squared_td_error_1'):
-            self.td_error = self.td_r + GAMMA * self.v_ - self.v
+            ## R = R_1
+            self.td_error = self.td_r / self.R + GAMMA * self.v_ / self.R - self.v / self.R
             self.loss = tf.square(self.td_error)  # TD_error = (r+gamma*V_next) - V_eval = target - prediction
         with tf.variable_scope('train_1'):
             self.train_op = tf.train.AdamOptimizer(lr).minimize(self.loss)
 
-    def learn(self, s, td_r, s_):
+    def learn(self, s, td_r, s_, R):
         s, s_ = s[np.newaxis, :], s_[np.newaxis, :]
-
         v_ = self.sess.run(self.v, {self.s: s_})
         td_error, _ = self.sess.run([self.td_r, self.train_op],
-                                    {self.s: s, self.v_: v_, self.td_r: td_r})
+                                    {self.s: s, self.v_: v_, self.td_r: td_r, self.R: R})
         return td_error
 
 class Critic_1(object):
@@ -146,6 +146,7 @@ class Critic_1(object):
         self.s = tf.placeholder(tf.float32, [1, n_features], "state")
         self.v_ = tf.placeholder(tf.float32, [1, 1], "v_next")
         self.td_r = tf.placeholder(tf.float32, None, 'td_r')
+        self.R = tf.placeholder(tf.float32, None, 'R')
 
         with tf.variable_scope('Critic_2'):
             l1 = tf.layers.dense(
@@ -169,17 +170,17 @@ class Critic_1(object):
             )
 
         with tf.variable_scope('squared_td_error_2'):
-            self.td_error = self.td_r + GAMMA * self.v_ - self.v
-            self.loss = tf.square(self.td_error)  # TD_error = (r+gamma*V_next) - V_eval = target - prediction
+            #R = R_2
+            self.td_error = self.td_r / self.R + GAMMA * self.v_ / self.R - self.v / self.R
+            self.loss = tf.square(self.td_error)
         with tf.variable_scope('train_2'):
             self.train_op = tf.train.AdamOptimizer(lr).minimize(self.loss)
 
-    def learn(self, s, td_r, s_):
+    def learn(self, s, td_r, s_, R):
         s, s_ = s[np.newaxis, :], s_[np.newaxis, :]
-
         v_ = self.sess.run(self.v, {self.s: s_})
         td_error, _ = self.sess.run([self.td_r, self.train_op],
-                                    {self.s: s, self.v_: v_, self.td_r: td_r})
+                                    {self.s: s, self.v_: v_, self.td_r: td_r, self.R: R})
         return td_error
 
 
@@ -212,46 +213,32 @@ for i_episode in range(MAX_EPISODE):
     logRs = []
     while True:
 
-        #        times = 0
-        #        five_step_rewards = []
-        #        for i in range(num_agents):
-        #            five_step_rewards.append([])
-        #        five_step_dones = []
-
-        #       while times < 5:
         a = actor.choose_action(s)
         s_, r, done, best_selection = env.step(a)
-        # for i, agent_reward in r:
-        #    five_step_rewards[i].append(agent_reward)
-        # five_step_dones.append(done)
-        # times+=1
         t += 1
-
-        # five_step = discount_with_dones(five_step_rewards, five_step_dones, GAMMA)
 
         track_r.append(r[a])
         best_selections.append(best_selection)
 
         errors = np.zeros(num_agents)
         error = 0.0
-        logR = 0.0
+        sumR = 0.0 ## sum of average agent reward
         for i, agent in enumerate(env.agents):
-            #    five_step = discount_with_dones(five_step_rewards[i], five_step_dones, GAMMA)
-            errors[i] = critics[i].learn(s, r[i], s_) # gradient = grad[r + gamma * V(s_) - V(s)]
-            R = agent.step_reward / t
+            R = agent.step_reward / t # agent average reward
+            errors[i] = critics[i].learn(s, r[i], s_, R)
             ## place to look agent average reward
 
-            if i == 0:
+            if i == 0: ## if this is agent_0
                 R_1.append(R)
 
-            if i == 1:
+            if i == 1: ## if this is agent_1
                 R_2.append(R)
 
-            if R == 0:
+            if R == 0: 
                 R = 0.01
-            error += errors[i] / R
-            logR += np.log(R)
-        logRs.append(logR)
+            error = sum(errors)
+            sumR += R
+        logRs.append(np.log(sumR))
 
         actor.learn(s, a, error)  # true_gradient = grad[logPi(s,a) * td_error]
 
@@ -259,23 +246,8 @@ for i_episode in range(MAX_EPISODE):
 
         best_selection_rate = float(sum(best_selections) / len(best_selections))
         if done or t >= MAX_EP_STEPS:
-            ep_rs_sum = sum(track_r)
 
-            R_1_turn_point = []
-            R_2_turn_point =[]
-
-            for i, agent in enumerate(env.agents):
-                #    five_step = discount_with_dones(five_step_rewards[i], five_step_dones, GAMMA)
-                if i == 0:
-                    R_1_turn_point = agent.turn_point
-                if i == 1:
-                    R_2_turn_point = agent.turn_point
-
-            if 'running_reward' not in globals():
-                running_reward = ep_rs_sum
-            else:
-                running_reward = running_reward * 0.95 + ep_rs_sum * 0.05
-            print("episode:", i_episode, "  best_selection_rate:", best_selection_rate, " Jump-Times", jump)
+            print("episode:", i_episode, "  best_selection_rate:", best_selection_rate)
             break
 
     best_selection_rates.append(best_selection_rate)

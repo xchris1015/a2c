@@ -1,6 +1,6 @@
 import gym
 
-from decoupled_a2c import A2CAgent
+from torch_a2c.decoupled_a2c import A2CAgent
 
 env = gym.make("CartPole-v0")
 obs_dim = env.observation_space.shape[0]

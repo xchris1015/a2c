@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Categorical
 
-from model import ValueNetwork, PolicyNetwork
+from torch_a2c.model import ValueNetwork, PolicyNetwork
 
 
 # unlike A2CAgent in a2c.py, here I separated value and policy network.
