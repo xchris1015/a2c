@@ -59,7 +59,7 @@ class Actor(object):
         with tf.variable_scope('Actor'):
             l1 = tf.layers.dense(
                 inputs=self.s,
-                units=250,  # number of hidden units
+                units=256,  # number of hidden units
                 activation=tf.nn.relu,
                 kernel_initializer=tf.random_normal_initializer(0., .1),  # weights
                 bias_initializer=tf.constant_initializer(0.1),  # biases
@@ -107,7 +107,7 @@ class Critic(object):
         with tf.variable_scope('Critic_1'):
             l1 = tf.layers.dense(
                 inputs=self.s,
-                units=250,  # number of hidden units
+                units=256,  # number of hidden units
                 activation=tf.nn.relu,  # None
                 # have to be linear to make sure the convergence of actor.
                 # But linear approximator seems hardly learns the correct Q.
@@ -151,7 +151,7 @@ class Critic_1(object):
         with tf.variable_scope('Critic_2'):
             l1 = tf.layers.dense(
                 inputs=self.s,
-                units=250,  # number of hidden units
+                units=256,  # number of hidden units
                 activation=tf.nn.relu,  # None
                 # have to be linear to make sure the convergence of actor.
                 # But linear approximator seems hardly learns the correct Q.
@@ -211,7 +211,7 @@ for i_episode in range(MAX_EPISODE):
     R_1 = []
     R_2 = []
     logRs = []
-    while True:
+    while True:  # step in each episode
 
         a = actor.choose_action(s)
         s_, r, done, best_selection = env.step(a)
@@ -222,7 +222,6 @@ for i_episode in range(MAX_EPISODE):
 
         errors = np.zeros(num_agents)
         error = 0.0
-        sumR = 0.0 ## sum of average agent reward
         for i, agent in enumerate(env.agents):
             R = agent.step_reward / t # agent average reward
             errors[i] = critics[i].learn(s, r[i], s_, R)
@@ -237,8 +236,8 @@ for i_episode in range(MAX_EPISODE):
             if R == 0: 
                 R = 0.01
             error = sum(errors)
-            sumR += R
-        logRs.append(np.log(sumR))
+        logR1 = np.log(R_1)
+        logR2 = np.log(R_2)
 
         actor.learn(s, a, error)  # true_gradient = grad[logPi(s,a) * td_error]
 
@@ -267,3 +266,4 @@ plt.legend(loc = 'upper right')
 plt.xlabel('Steps')
 plt.ylabel('logR_1 + logR_2')
 plt.show()
+

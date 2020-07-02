@@ -18,8 +18,8 @@ from World import World
 import matplotlib.pyplot as plt
 import pandas as pd
 
-np.random.seed(2)
-tf.set_random_seed(2)  # reproducible
+np.random.seed(3)
+tf.set_random_seed(3)  # reproducible
 
 # Superparameters
 OUTPUT_GRAPH = False
@@ -172,7 +172,8 @@ for i_episode in range(MAX_EPISODE):
                 R_1.append(R)
             if i == 1:
                 R_2.append(R)
-            sumR += r[i] / R  ## r_1/R_1 + r_2/R_2
+            # sumR += r[i] / R  ## r_1/R_1 + r_2/R_2
+            sumR += R
         logR = np.log(sumR)
         logRs.append(logR)
 
