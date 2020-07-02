@@ -236,8 +236,10 @@ for i_episode in range(MAX_EPISODE):
             if R == 0: 
                 R = 0.01
             error = sum(errors)
-        logR1 = np.log(R_1)
-        logR2 = np.log(R_2)
+        logR1 = np.log(R_1[-1]) #R_1[-1] == R_1 at this step
+        logR2 = np.log(R_2[-1]) #R_2[-1] == R_2 at this step
+
+        logRs.append(logR1 + logR2)
 
         actor.learn(s, a, error)  # true_gradient = grad[logPi(s,a) * td_error]
 
