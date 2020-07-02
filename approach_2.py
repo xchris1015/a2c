@@ -164,7 +164,6 @@ for i_episode in range(MAX_EPISODE):
         s_, r, done, best_selection = env.step(a)
         t += 1
         ## logR for this step
-        sumR = 0.0
         for i, agent in enumerate(env.agents):
             R = agent.step_reward / t ## total reward / steps
 
@@ -173,9 +172,9 @@ for i_episode in range(MAX_EPISODE):
             if i == 1:
                 R_2.append(R)
             # sumR += r[i] / R  ## r_1/R_1 + r_2/R_2
-            sumR += R
-        logR = np.log(sumR)
-        logRs.append(logR)
+        logR1 = np.log(R_1[-1])
+        logR2 = np.log(R_2[-1])
+        logRs.append(logR1 + logR2)
 
         best_selections.append(best_selection)
 
