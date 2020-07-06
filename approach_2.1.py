@@ -25,7 +25,7 @@ tf.set_random_seed(3)  # reproducible
 OUTPUT_GRAPH = False
 MAX_EPISODE = 1
 DISPLAY_REWARD_THRESHOLD = 200  # renders environment if total episode reward is greater then this threshold
-MAX_EP_STEPS = 30000  # maximum time step in one episode
+MAX_EP_STEPS = 30000 # maximum time step in one episode
 RENDER = False  # rendering wastes time
 GAMMA = 0.9  # reward discount in TD error
 LR_A = 0.001  # learning rate for actor
@@ -39,14 +39,6 @@ N_F = num_agents
 N_A = num_agents
 
 
-def discount_with_dones(rewards, dones, gamma):
-    discounted = []
-    r = 0
-    for reward, done in zip(rewards[::-1], dones[::-1]):
-        r = reward + gamma * r * (1. - done)  # fixed off by one bug
-        discounted.append(r)
-    return discounted[::-1]
-
 
 class Actor(object):
     def __init__(self, sess, n_features, n_actions, lr=0.001):
@@ -59,7 +51,7 @@ class Actor(object):
         with tf.variable_scope('Actor'):
             l1 = tf.layers.dense(
                 inputs=self.s,
-                units=256,  # number of hidden units
+                units=250,  # number of hidden units
                 activation=tf.nn.relu,
                 kernel_initializer=tf.random_normal_initializer(0., .1),  # weights
                 bias_initializer=tf.constant_initializer(0.1),  # biases
@@ -96,18 +88,17 @@ class Actor(object):
 
 
 class Critic(object):
-    def __init__(self, sess, n_features, lr=0.01):
+    def __init__(self, env, sess, n_features, lr=0.01):
         self.sess = sess
 
         self.s = tf.placeholder(tf.float32, [1, n_features], "state")
         self.v_ = tf.placeholder(tf.float32, [1, 1], "v_next")
         self.td_r = tf.placeholder(tf.float32, None, 'td_r')
-        self.R = tf.placeholder(tf.float32, None, 'R')
 
-        with tf.variable_scope('Critic_1'):
+        with tf.variable_scope('Critic'):
             l1 = tf.layers.dense(
                 inputs=self.s,
-                units=256,  # number of hidden units
+                units=250,  # number of hidden units
                 activation=tf.nn.relu,  # None
                 # have to be linear to make sure the convergence of actor.
                 # But linear approximator seems hardly learns the correct Q.
@@ -122,77 +113,35 @@ class Critic(object):
                 activation=None,
                 kernel_initializer=tf.random_normal_initializer(0., .1),  # weights
                 bias_initializer=tf.constant_initializer(0.1),  # biases
-                name='V1'
+                name='V'
             )
 
-        with tf.variable_scope('squared_td_error_1'):
-            ## R = R_1
-            self.td_error = self.td_r  + GAMMA * self.v_  - self.v
+        with tf.variable_scope('squared_td_error'):
+            combine_rewards = 0
+            for i, agent in enumerate(env.agents):
+                combine_rewards += self.td_r[i] / agent.average_step_reward
+            self.td_error = combine_rewards + GAMMA * self.v_ - self.v
             self.loss = tf.square(self.td_error)  # TD_error = (r+gamma*V_next) - V_eval = target - prediction
-        with tf.variable_scope('train_1'):
+        with tf.variable_scope('train'):
             self.train_op = tf.train.AdamOptimizer(lr).minimize(self.loss)
 
-    def learn(self, s, td_r, s_, R):
+    def learn(self, s, td_r, s_):
         s, s_ = s[np.newaxis, :], s_[np.newaxis, :]
+
         v_ = self.sess.run(self.v, {self.s: s_})
         td_error, _ = self.sess.run([self.td_r, self.train_op],
-                                    {self.s: s, self.v_: v_, self.td_r: td_r, self.R: R})
-        return td_error
-
-class Critic_1(object):
-    def __init__(self, sess, n_features, lr=0.01):
-        self.sess = sess
-
-        self.s = tf.placeholder(tf.float32, [1, n_features], "state")
-        self.v_ = tf.placeholder(tf.float32, [1, 1], "v_next")
-        self.td_r = tf.placeholder(tf.float32, None, 'td_r')
-        self.R = tf.placeholder(tf.float32, None, 'R')
-
-        with tf.variable_scope('Critic_2'):
-            l1 = tf.layers.dense(
-                inputs=self.s,
-                units=256,  # number of hidden units
-                activation=tf.nn.relu,  # None
-                # have to be linear to make sure the convergence of actor.
-                # But linear approximator seems hardly learns the correct Q.
-                kernel_initializer=tf.random_normal_initializer(0., .1),  # weights
-                bias_initializer=tf.constant_initializer(0.1),  # biases
-                name='l2'
-            )
-
-            self.v = tf.layers.dense(
-                inputs=l1,
-                units=1,  # output units
-                activation=None,
-                kernel_initializer=tf.random_normal_initializer(0., .1),  # weights
-                bias_initializer=tf.constant_initializer(0.1),  # biases
-                name='V2'
-            )
-
-        with tf.variable_scope('squared_td_error_2'):
-            #R = R_2
-            self.td_error = self.td_r + GAMMA * self.v_ - self.v
-            self.loss = tf.square(self.td_error)
-        with tf.variable_scope('train_2'):
-            self.train_op = tf.train.AdamOptimizer(lr).minimize(self.loss)
-
-    def learn(self, s, td_r, s_, R):
-        s, s_ = s[np.newaxis, :], s_[np.newaxis, :]
-        v_ = self.sess.run(self.v, {self.s: s_})
-        td_error, _ = self.sess.run([self.td_r, self.train_op],
-                                    {self.s: s, self.v_: v_, self.td_r: td_r, self.R: R})
+                                    {self.s: s, self.v_: v_, self.td_r: td_r})
         return td_error
 
 
 sess = tf.Session()
 
 actor = Actor(sess, n_features=N_F, n_actions=N_A, lr=LR_A)
-critics = []
 
-critic_1 = Critic(sess, n_features=N_F, lr=LR_C)
-critics.append(critic_1)
-critic_2 = Critic_1(sess, n_features=N_F, lr=LR_C)
-critics.append(critic_2)
+
+critic = Critic(env, sess, n_features=N_F, lr=LR_C)
+
+
 
 # we need a good teacher, so the teacher should learn faster than the actor
 
@@ -208,55 +157,48 @@ for i_episode in range(MAX_EPISODE):
     jump = 0
     track_r = []
     best_selections = []
-    R_1 = []
-    R_2 = []
-    logRs = []
-    logR1 = []
-    logR2 = []
-    while True:  # step in each episode
+    R_1, R_2, logR1, logR2, logRs = [], [], [], [], [] ## average rewards and log (r/average_reward)
+    while True:
 
         a = actor.choose_action(s)
         s_, r, done, best_selection = env.step(a)
         t += 1
-
-        track_r.append(r[a])
-        best_selections.append(best_selection)
-
-        errors = np.zeros(num_agents)
-        error = 0.0
+        ## logR for this step
+        sumR = 0.0
         sum_logR = 0.0
         for i, agent in enumerate(env.agents):
-            R = agent.step_reward / t # agent average reward
+            R = agent.step_reward / t ## total reward / steps
             logR = np.log(R)
-            errors[i] = critics[i].learn(s, r[i], s_, R)
-            ## place to look agent average reward
-
-            if i == 0: ## if this is agent_0
+            if i == 0:
                 R_1.append(R)
                 logR1.append(logR)
-            if i == 1: ## if this is agent_1
+            if i == 1:
                 R_2.append(R)
                 logR2.append(logR)
-            if R == 0: 
-                R = 0.01
-            error = sum(errors)
 
-        logRs.append(logR1[-1] + logR2[-1])
+            sumR += R
+            # sumR += r[i] / R  ## r_1/R_1 + r_2/R_2
+        sum_logR = logR1[-1] + logR2[-1]
+        logRs.append(sum_logR)
 
-        actor.learn(s, a, error)  # true_gradient = grad[logPi(s,a) * td_error]
+        best_selections.append(best_selection)
+
+        td_error = critic.learn(s, r, s_)
+
+        actor.learn(s, a, td_error)  # true_gradient = grad[logPi(s,a) * td_error]
 
         s = s_
 
         best_selection_rate = float(sum(best_selections) / len(best_selections))
         if done or t >= MAX_EP_STEPS:
-
-            print("episode:", i_episode, " Result: ", R_1[-1]/0.65849 + R_2[-1]/0.9877)
+            print("episode:", i_episode, "  best_selection_rate:", best_selection_rate, " Result: ", R_1[-1]/0.65849 + R_2[-1]/0.98775)
             break
 
     best_selection_rates.append(best_selection_rate)
-    R_1_csv = pd.DataFrame(R_1).to_csv("R_1_approach_1.csv", index= False)
-    R_2_csv = pd.DataFrame(R_2).to_csv("R_2_approach_1.csv", index=False)
-    logR_csv = pd.DataFrame(logRs).to_csv("logRs_approach_1.csv", index=False)
+
+    R_1_csv = pd.DataFrame(R_1).to_csv("R_1_approach_2.1.csv", index= False)
+    R_2_csv = pd.DataFrame(R_2).to_csv("R_2_approach_2.1.csv", index=False)
+    logR_csv = pd.DataFrame(logRs).to_csv("logRs_approach_2.1.csv", index=False)
 
 plt.plot(R_1, label = 'R_1')
 plt.plot(R_2, label = 'R_2')
@@ -272,4 +214,3 @@ plt.legend(loc = 'upper right')
 plt.xlabel('Steps')
 plt.ylabel('logR_1 + logR_2, logR_1, logR_2')
 plt.show()
-

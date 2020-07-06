@@ -26,7 +26,7 @@ class World(gym.Env):
         self.time = 0
         ## reward map from paper, all the reward are fixed
         self.reward_map = dict({0: [1.50, 0.768],
-                                1: [2.25, 1.00],
+                                1: [2.25, 1.01],
                                 2: [1.25, 0.384],
                                 3: [1.50, 1.12],
                                 4: [1.75, 0.384],
@@ -67,19 +67,18 @@ class World(gym.Env):
             reward = np.zeros(self.num_agents)
 
         best_selection = True
+        self.state = np.zeros(self.num_agents);
         for i, agent in enumerate(self.agents):
             agent.state = self.get_new_state(agent)
+            self.state[i] = agent.state
             if reward[action] < self.reward_map.get(i)[agent.state]:
                 best_selection = False
-            if action == i:
-                agent.step_reward += reward[action]
             agent.reward_record.append(reward[i])
-            agent.average_step_reward = agent.step_reward / self.time
+
             #print(self.time)
             #print(agent.step_reward)
             #print("Agent_",i,"    State: ","Good" if agent.state == 0 else "Bad", "   Agent_Reward:", self.get_reward(i))
         #print("Current Selection:", action)
-
         return np.array(self.state), np.array(reward), done, best_selection
 
     """
@@ -108,8 +107,10 @@ class World(gym.Env):
         reward = np.zeros(len(self.agents))
         for i, agent in enumerate(self.agents):
             if action == i:
-                reward[action] = self.reward_map[action][agent.state]
-
+                transmit_rate = self.reward_map[action][agent.state]
+                agent.step_reward += transmit_rate
+                agent.average_step_reward = agent.step_reward / self.time
+                reward[action] = transmit_rate / agent.average_step_reward
         return reward
 
     """
